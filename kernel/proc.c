@@ -146,6 +146,22 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+ #ifndef NONE
+    if (p->pid > 2) {
+      release(&p->lock);
+      createSwapFile(p);
+      acquire(&p->lock);
+    }
+  #endif
+  for (int i = 0 ; i<MAX_PSYC_PAGES; i++){
+      #if LAPA
+        p->ram[i].accesscounter = 0xFFFFFFFF;
+      #endif
+      #if NFUA
+        p->ram[i].accesscounter = 0;
+  #endif
+  }
+
   return p;
 }
 
@@ -169,6 +185,17 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  #ifndef NONE
+    if(p->pid > 2) {
+      for (int i = 0; i < MAX_PSYC_PAGES; i++){
+        p->ram[i].adress = UNUSED;
+        p->ram[i].state = UNUSED;
+        p->swaps[i].adress = UNUSED;
+        p->swaps[i].state = UNUSED;
+      }
+    }
+  #endif
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -188,7 +215,7 @@ proc_pagetable(struct proc *p)
   // only the supervisor uses it, on the way
   // to/from user space, so not PTE_U.
   if(mappages(pagetable, TRAMPOLINE, PGSIZE,
-              (uint64)trampoline, PTE_R | PTE_X) < 0){
+              (uint64)trampoline, PTE_R | PTE_X, REG_MAP) < 0){
     uvmfree(pagetable, 0);
     return 0;
   }
@@ -196,7 +223,7 @@ proc_pagetable(struct proc *p)
   // map the trapframe page just below the trampoline page, for
   // trampoline.S.
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
-              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+              (uint64)(p->trapframe), PTE_R | PTE_W, REG_MAP) < 0){
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
@@ -276,6 +303,7 @@ growproc(int n)
 
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
+static char global_buff[PGSIZE*MAX_PSYC_PAGES];
 int
 fork(void)
 {
@@ -301,6 +329,28 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  #ifndef NONE
+  int swapSize = 0;
+    if(p->pid > 2) {
+      for (int i = 0; i < MAX_PSYC_PAGES; i++){
+        np->swaps[i].adress = p->swaps[i].adress;
+        np->swaps[i].state = p->swaps[i].state;
+        np->ram[i].adress = p->ram[i].adress;
+        np->ram[i].state = p->ram[i].state;
+        np->ram[i].creationTime = p->ram[i].creationTime;
+        np->swaps[i].accesscounter = p->swaps[i].accesscounter;
+        if(p->swaps[i].state == USED)
+          swapSize++;
+      }
+    release(&np->lock);
+    if(readFromSwapFile(p, global_buff, 0, swapSize*PGSIZE) == -1|| 
+        writeToSwapFile(np, global_buff, 0, swapSize*PGSIZE) == -1)
+      panic("Fail");
+    acquire(&np->lock);
+    }
+    #endif
+
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
@@ -364,7 +414,10 @@ exit(int status)
   iput(p->cwd);
   end_op();
   p->cwd = 0;
-
+#ifndef NONE
+if(p->pid > 2)
+    removeSwapFile(p);
+#endif
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -651,6 +704,18 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
     return 0;
   }
 }
+
+void updateINFO(){
+ struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if (p->pid > 2 && p->state > 1 && p->state < 5) //proc is either running, runnable or sleeping
+      updateCounter(p); //implemented in vm.c
+        release(&p->lock);
+  }
+
+}
+
 
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.

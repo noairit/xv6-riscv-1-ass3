@@ -68,11 +68,22 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+     #ifndef NONE
+     if(p->pid > 2 && (r_scause() == 12) | (r_scause() == 13) | (r_scause() == 15)) {
+        uint64 a = PGROUNDDOWN(r_stval());
+        pte_t *pte = walk(p->pagetable, a, 0);
+        if(*pte & PTE_PG) {
+          pageFault(a, pte);
+          goto cont;
+        }
+    }
+    #endif
+    
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
   }
-
+  cont:
   if(killed(p))
     exit(-1);
 
@@ -207,6 +218,12 @@ devintr()
 
     if(cpuid() == 0){
       clockintr();
+      #if LAPA
+        updateINFO(); 
+      #endif
+      #if NFUA
+        updateINFO();
+      #endif
     }
     
     // acknowledge the software interrupt by clearing

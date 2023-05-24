@@ -18,6 +18,7 @@
         "*.tcc": "c",
         "cstdint": "c",
         "typeinfo": "c",
-        "stat.h": "c"
+        "stat.h": "c",
+        "elf.h": "c"
     },
 }

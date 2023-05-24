@@ -1,3 +1,10 @@
+#define MAX_PSYC_PAGES 16
+#define MAX_TOTAL_PAGES 32
+#define PTE_PG (1L << 9) // Paged out to secondary storage 
+#define REG_MAP 1
+#define SPEC_MAP 0
+
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -81,6 +88,17 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// Q1
+struct page {
+  int state;      
+  uint64 adress;    //addr of VA
+  pagetable_t pagetable;   
+  uint offsetInSF;
+  int accesscounter; 
+  uint creationTime;
+};
+
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -104,4 +122,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct file *swapFile;
+  struct page ram[MAX_PSYC_PAGES];
+  struct page swaps[MAX_PSYC_PAGES];
+
+
 };
