@@ -91,7 +91,7 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 // Q1
 struct page {
   int state;      
-  uint64 adress;    //addr of VA
+  uint64 address;    //addr of VA
   pagetable_t pagetable;   
   uint offsetInSF;
   int accesscounter; 

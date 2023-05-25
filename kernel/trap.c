@@ -73,7 +73,7 @@ usertrap(void)
         uint64 a = PGROUNDDOWN(r_stval());
         pte_t *pte = walk(p->pagetable, a, 0);
         if(*pte & PTE_PG) {
-          pageFault(a, pte);
+          onPageFault(a, pte);
           goto cont;
         }
     }

@@ -189,9 +189,9 @@ freeproc(struct proc *p)
   #ifndef NONE
     if(p->pid > 2) {
       for (int i = 0; i < MAX_PSYC_PAGES; i++){
-        p->ram[i].adress = UNUSED;
+        p->ram[i].address = UNUSED;
         p->ram[i].state = UNUSED;
-        p->swaps[i].adress = UNUSED;
+        p->swaps[i].address = UNUSED;
         p->swaps[i].state = UNUSED;
       }
     }
@@ -334,9 +334,9 @@ fork(void)
   int swapSize = 0;
     if(p->pid > 2) {
       for (int i = 0; i < MAX_PSYC_PAGES; i++){
-        np->swaps[i].adress = p->swaps[i].adress;
+        np->swaps[i].address = p->swaps[i].address;
         np->swaps[i].state = p->swaps[i].state;
-        np->ram[i].adress = p->ram[i].adress;
+        np->ram[i].address = p->ram[i].address;
         np->ram[i].state = p->ram[i].state;
         np->ram[i].creationTime = p->ram[i].creationTime;
         np->swaps[i].accesscounter = p->swaps[i].accesscounter;
@@ -717,7 +717,7 @@ void updateINFO(){
 }
 
 
-// Print a process listing to console.  For debugging.
+/* Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
 void
@@ -745,4 +745,4 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
-}
+} */

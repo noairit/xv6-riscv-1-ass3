@@ -10,9 +10,9 @@
 #include "proc.h"
 int createTime();
 int findpagetoswap();
-int ramIntoDisc(struct proc *p, int swapI);
-int EmptyRoomOnRam(struct proc* p);
-int EmptyRoomToSwap(struct proc* p);
+int ramToSwapFile(struct proc *p, int swapI);
+int getPlaceOnRam(struct proc* p);
+int getPlaceOnSwap(struct proc* p);
 static char global_buff[PGSIZE];
 
 /*
@@ -207,10 +207,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       struct proc *p = myproc();
       if(p->pid > 2) {
         for (int i = 0; i < MAX_PSYC_PAGES; i++){
-          if(p->ram[i].adress == a) {
-            p->ram[i].adress = UNUSED;
+          if(p->ram[i].address == a) {
+            p->ram[i].address = UNUSED;
             p->ram[i].state= UNUSED;
-            p->swaps[i].adress = UNUSED;
+            p->swaps[i].address = UNUSED;
             p->swaps[i].state = UNUSED;
           }
         }
@@ -277,18 +277,18 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
     int swapI = -1;
     #ifndef NONE
     if(p->pid > 2 && p->pagetable == pagetable) {
-      ramI = EmptyRoomOnRam(p);
+      ramI = getPlaceOnRam(p);
       // no empty room on ram
       if(ramI == -1){
-        swapI = EmptyRoomToSwap(p);
+        swapI = getPlaceOnSwap(p);
       //room in swap
       if(swapI != -1) 
-        ramI  = ramIntoDisc(p, swapI);
+        ramI  = ramToSwapFile(p, swapI);
       else 
         panic("Out OF Mem");
       }  
       p->ram[ramI].state = USED;
-      p->ram[ramI].adress = a;
+      p->ram[ramI].address = a;
       p->ram[ramI].creationTime = createTime();
        #if LAPA
        p->ram[ramI].accesscounter = 0xFFFFFFFF;
@@ -510,20 +510,20 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 // this method takes page from ram and insert it to swapfile
 int
-ramIntoDisc(struct proc *p, int swapI)
+ramToSwapFile(struct proc *p, int swapI)
 {
   int ramI = findpagetoswap(p);
   
-  uint64 pa = walkaddr(p->pagetable, p->ram[ramI].adress);
+  uint64 pa = walkaddr(p->pagetable, p->ram[ramI].address);
   if(writeToSwapFile(p, (void*)pa, PGSIZE*swapI, PGSIZE) == -1)
     panic("Fail");
   
   p->swaps[swapI].state = USED;
-  p->swaps[swapI].adress = p->ram[ramI].adress;
+  p->swaps[swapI].address = p->ram[ramI].address;
   p->swaps[swapI].offsetInSF = swapI * PGSIZE;
   
   pte_t *pte;
-  pte = walk(p->pagetable, p->ram[ramI].adress, 0);
+  pte = walk(p->pagetable, p->ram[ramI].address, 0);
   *pte |= PTE_PG;
   *pte &= ~PTE_V;
   
@@ -535,13 +535,13 @@ void discIntoRam(uint64 va, pte_t *pte, char* pa, struct proc *p, int ramI){
   int swapI = 0;
   // find page on disc
   for ( swapI = 0; swapI < MAX_PSYC_PAGES;swapI++)
-    if(p->swaps[swapI].adress == va) 
+    if(p->swaps[swapI].address == va) 
       break;
   
   // update disk & ram  
-  p->swaps[swapI].adress = UNUSED;
+  p->swaps[swapI].address = UNUSED;
   p->swaps[swapI].state = UNUSED;
-  p->ram[ramI].adress = va;
+  p->ram[ramI].address = va;
   p->ram[ramI].state = USED;
   p->ram[ramI].creationTime = createTime();
   #if LAPA
@@ -556,7 +556,7 @@ void discIntoRam(uint64 va, pte_t *pte, char* pa, struct proc *p, int ramI){
   
 }
 
-int EmptyRoomOnRam(struct proc* p){
+int getPlaceOnRam(struct proc* p){
   for (int i =0 ; i<MAX_PSYC_PAGES; i++){
     if (p->ram[i].state == 0)
       return i;
@@ -564,7 +564,7 @@ int EmptyRoomOnRam(struct proc* p){
   return -1;
 }
 
-int EmptyRoomToSwap(struct proc* p){
+int getPlaceOnSwap(struct proc* p){
   for (int i =0 ; i<MAX_PSYC_PAGES; i++){
     if (p->swaps[i].state == 0)
       return i;
@@ -573,27 +573,27 @@ int EmptyRoomToSwap(struct proc* p){
   return -1;
 }
 
-void pageFault(uint64 va, pte_t *pte)
+void onPageFault(uint64 va, pte_t *pte)
 {
   struct proc *p = myproc();
   char *pa = kalloc();
-  int ramI = EmptyRoomOnRam(p);
+  int ramI = getPlaceOnRam(p);
   // no empty room on ram
   if(ramI == -1) {
     //choose indx on ram
     ramI = findpagetoswap(p);
-    uint ramVa = p->ram[ramI].adress;
+    uint ramVa = p->ram[ramI].address;
     uint64 ramPa = walkaddr(p->pagetable, ramVa);
     
     discIntoRam(va, pte, pa, p, ramI);
-    int swapI = EmptyRoomToSwap(p);
+    int swapI = getPlaceOnSwap(p);
 
     if(writeToSwapFile(p, (void*)ramPa, PGSIZE*swapI, PGSIZE) == -1)
       panic("Fail");
     kfree((void*)ramPa);   
 
     p->swaps[swapI].state = USED;
-    p->swaps[swapI].adress = ramVa;
+    p->swaps[swapI].address = ramVa;
     
     pte_t *swapPte = walk(p->pagetable, ramVa, 0);
     *swapPte = *swapPte | PTE_PG;
@@ -658,7 +658,7 @@ int aSCFIFO(){
       ctime = myproc()->ram[i].creationTime;
       }
   }
-  pte = walk(myproc()->pagetable, myproc()->ram[pageIndex].adress,0);
+  pte = walk(myproc()->pagetable, myproc()->ram[pageIndex].address,0);
   if (*pte & PTE_A) {
     *pte &= ~PTE_A; // turn off PTE_A flag
 
@@ -688,7 +688,7 @@ void updateCounter(struct proc * p){
   int i;
   for (i = 0; i < MAX_PSYC_PAGES; i++) {
     if (p->ram[i].state == 1){
-      pte = walk(p->pagetable,p->ram[i].adress,0);
+      pte = walk(p->pagetable,p->ram[i].address,0);
       if (*pte & PTE_A) { // check if page accessed 
         *pte &= ~PTE_A; // turn off PTE_A flag
          p->ram[i].accesscounter = p->ram[i].accesscounter >> 1;

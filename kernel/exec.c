@@ -117,13 +117,13 @@ exec(char *path, char **argv)
    #ifndef NONE
     if(p->pid > 2) {
       for (int i = 0; i < MAX_PSYC_PAGES; i++){
-        p->ram[i].adress = UNUSED;
+        p->ram[i].address = UNUSED;
         p->ram[i].state = UNUSED;
-        p->swaps[i].adress = UNUSED;
+        p->swaps[i].address = UNUSED;
         p->swaps[i].state = UNUSED;
       }     
       for(uint i =0, a = 0; a < sz; a += PGSIZE, i ++){
-        p->ram[i].adress = a;
+        p->ram[i].address = a;
         p->ram[i].state = USED;
         #if LAPA
           p->ram[i].accesscounter = 0xFFFFFFFF;
