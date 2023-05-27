@@ -138,8 +138,8 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-	$U/_test_ustack\
-	$U/_test\
+	
+	
 
 	
 

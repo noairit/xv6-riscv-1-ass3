@@ -717,7 +717,7 @@ void updateINFO(){
 }
 
 
-/* Print a process listing to console.  For debugging.
+// Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
 void
@@ -745,4 +745,4 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
-} */
+} 
